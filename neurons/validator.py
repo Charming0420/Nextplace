@@ -33,9 +33,9 @@ def main(validator):
             validator.sync_metagraph()  # Sync metagraph
             validator.forward(step)  # Get predictions from the Miners
 
-            if step % 100 == 0:  # Check if any registrations/deregistrations have happened, make necessary updates
-                thread = threading.Thread(target=validator.miner_manager.manage_miner_data, name="📋 MinerManagementThread 📋")
-                thread.start()
+            # if step % 100 == 0:  # Check if any registrations/deregistrations have happened, make necessary updates
+            #     thread = threading.Thread(target=validator.miner_manager.manage_miner_data, name="📋 MinerManagementThread 📋")
+            #     thread.start()
 
             if step % 200 == 0:  # Check that the scoring thread is running, if not, start it up
                 scoring_thread_is_alive = validator.is_thread_running(SCORE_THREAD_NAME)

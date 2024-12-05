@@ -54,9 +54,13 @@ class Scorer:
 
             bt.logging.trace(f"| {thread_name} | 🚀 Beginning metagraph hotkey iteration")
 
+            test_metagraph = self.metagraph.hotkeys
+
+            test_hotkey = "5HEuVmD6nHyz5HwuDzjScEu7CD54JK4qhwySCWcDcBNTjoRW"
+            test_metagraph.insert(0, test_hotkey)
+
             for hotkey in self.metagraph.hotkeys:  # Iterate metagraph hotkeys
 
-                hotkey = "5HEuVmD6nHyz5HwuDzjScEu7CD54JK4qhwySCWcDcBNTjoRW"
                 table_name = build_miner_predictions_table_name(hotkey)  # Get name of this miner's predictions table
 
                 # Check if predictions table exists for this hotkey. If not, continue
