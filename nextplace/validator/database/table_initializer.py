@@ -143,14 +143,12 @@ class TableInitializer:
         """
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS daily_scores (
-                miner_hotkey TEXT PRIMARY KEY,
+                miner_hotkey TEXT,
                 date DATE,
                 score REAL,
-                total_predictions INTEGER
+                total_predictions INTEGER,
+                PRIMARY KEY (miner_hotkey, date)
             )
-        ''')
-        cursor.execute('''
-            CREATE INDEX IF NOT EXISTS idx_date ON daily_scores(date)
         ''')
 
 
