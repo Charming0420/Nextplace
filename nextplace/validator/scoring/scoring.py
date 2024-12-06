@@ -55,9 +55,8 @@ class Scorer:
             bt.logging.trace(f"| {thread_name} | 🚀 Beginning metagraph hotkey iteration")
 
             test_hotkeys = [
-                "5HEuVmD6nHyz5HwuDzjScEu7CD54JK4qhwySCWcDcBNTjoRW",
-                "5DDXbJ4NeaSWr2fdz96FoKoyFUXiSSirkhdHVVh2Y2tLKtVe",
                 "5GmaEXzFUAU3EZfGHAY8w7Yq9p21eHAJwPcGFUVeT7jecWcD",
+                "5DDXbJ4NeaSWr2fdz96FoKoyFUXiSSirkhdHVVh2Y2tLKtVe",
                 "5ERWw1iogMKw5dRRcnNi7pzbS6PhB4pqEGQoWsb7W9heGrWE",
                 "5CkeKuf7TBVqrfaKrEU3pABypdNidhYdGfQUU52JtnSawCsS",
             ]
