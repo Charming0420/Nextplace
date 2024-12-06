@@ -41,8 +41,7 @@ class ScoringCalculator:
             None
         """
         current_thread = threading.current_thread().name
-        # today = datetime.now(timezone.utc).date()
-        today = "2024-12-05"
+        today = datetime.now(timezone.utc).date()
         bt.logging.info(f"| {current_thread} | 📅 Updating daily_scores for {today}")
 
         existing_daily_score_query = """
