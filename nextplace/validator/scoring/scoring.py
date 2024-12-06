@@ -54,12 +54,15 @@ class Scorer:
 
             bt.logging.trace(f"| {thread_name} | 🚀 Beginning metagraph hotkey iteration")
 
-            test_metagraph = self.metagraph.hotkeys
+            test_hotkeys = [
+                "5HEuVmD6nHyz5HwuDzjScEu7CD54JK4qhwySCWcDcBNTjoRW",
+                "5DDXbJ4NeaSWr2fdz96FoKoyFUXiSSirkhdHVVh2Y2tLKtVe",
+                "5GmaEXzFUAU3EZfGHAY8w7Yq9p21eHAJwPcGFUVeT7jecWcD",
+                "5ERWw1iogMKw5dRRcnNi7pzbS6PhB4pqEGQoWsb7W9heGrWE",
+                "5CkeKuf7TBVqrfaKrEU3pABypdNidhYdGfQUU52JtnSawCsS",
+            ]
 
-            test_hotkey = "5HEuVmD6nHyz5HwuDzjScEu7CD54JK4qhwySCWcDcBNTjoRW"
-            test_metagraph.insert(0, test_hotkey)
-
-            for hotkey in test_metagraph:  # Iterate metagraph hotkeys
+            for hotkey in test_hotkeys:  # Iterate metagraph hotkeys
 
                 table_name = build_miner_predictions_table_name(hotkey)  # Get name of this miner's predictions table
 
