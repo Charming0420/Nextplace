@@ -28,6 +28,10 @@ class RealEstateMiner(BaseMinerNeuron):
     def forward(self, synapse: RealEstateSynapse) -> RealEstateSynapse:
         start_time = datetime.now()
         
+        # 先執行預測
+        self.model.run_inference(synapse)
+        self._set_force_update_prediction_flag(synapse)
+        
         # 記錄請求
         stake, uid = self.get_validator_stake_and_uid(synapse.dendrite.hotkey)
         
@@ -59,8 +63,10 @@ class RealEstateMiner(BaseMinerNeuron):
                     'property_type': pred.property_type if hasattr(pred, 'property_type') else None,
                     'last_sale_date': pred.last_sale_date if hasattr(pred, 'last_sale_date') else None,
                     'hoa_dues': pred.hoa_dues if hasattr(pred, 'hoa_dues') else None,
-                    'market': pred.market if hasattr(pred, 'market') else None
-                }   
+                    'market': pred.market if hasattr(pred, 'market') else None,
+                    'predicted_sale_price': pred.predicted_sale_price if hasattr(pred, 'predicted_sale_price') else None,
+                    'predicted_sale_date': pred.predicted_sale_date if hasattr(pred, 'predicted_sale_date') else None
+                }
                 request_data['predictions'].append(pred_dict)
         
         request_id = self.logger.log_request(
@@ -70,28 +76,9 @@ class RealEstateMiner(BaseMinerNeuron):
             validator_stake=stake
         )
         
-        # 處理請求
-        self.model.run_inference(synapse)
-        self._set_force_update_prediction_flag(synapse)
-        
-        # 準備響應數據
-        response_data = {
-            'hotkey': synapse.dendrite.hotkey,
-            'predictions': []
-        }
-        
-        if hasattr(synapse, 'real_estate_predictions') and hasattr(synapse.real_estate_predictions, 'predictions'):
-            for pred in synapse.real_estate_predictions.predictions:
-                pred_dict = {
-                    'nextplace_id': pred.nextplace_id if hasattr(pred, 'nextplace_id') else None,
-                    'predicted_sale_price': pred.predicted_sale_price if hasattr(pred, 'predicted_sale_price') else None,
-                    'predicted_sale_date': pred.predicted_sale_date if hasattr(pred, 'predicted_sale_date') else None
-                }
-                response_data['predictions'].append(pred_dict)
-        
         # 記錄響應
         processing_time = (datetime.now() - start_time).total_seconds()
-        self.logger.log_response(request_id, json.dumps(response_data), processing_time)
+        self.logger.log_response(request_id, json.dumps(request_data), processing_time)
         
         return synapse
 
