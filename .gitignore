@@ -12,3 +12,4 @@ __pycache__/
 venv
 
 # Ignore specific directories
+requests_log.db
