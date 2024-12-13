@@ -1,7 +1,7 @@
 <div align="center">
 
 # **Nextplace AI** <!-- omit in toc -->
-# 測試一下
+# 測試一下1
 ## Real Estate Market Research <!-- omit in toc -->
 
 [Discord](https://discord.gg/xbRhw9jX) • [Taostats](https://taostats.io/subnets/48/metagraph) • [Website](https://nextplace.ai/)
