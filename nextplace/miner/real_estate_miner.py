@@ -42,15 +42,48 @@ class RealEstateMiner(BaseMinerNeuron):
         # 記錄請求
         stake, uid = self.get_validator_stake_and_uid(synapse.dendrite.hotkey)
         
-        # 將 synapse 轉換為可序列化的字典
-        request_data = {
+        # 將 synapse 轉換為可序列化的字典 (用於資料庫存儲)
+        db_request_data = {
+            'hotkey': synapse.dendrite.hotkey,
+            'original_predictions': [],  # 用於存儲原始資料
+            'predictions': []  # 用於存儲預測結果
+        }
+        
+        # 用於回傳給 Validator 的資料
+        validator_response = {
             'hotkey': synapse.dendrite.hotkey,
             'predictions': []
         }
         
         if hasattr(synapse, 'real_estate_predictions') and hasattr(synapse.real_estate_predictions, 'predictions'):
             for pred in synapse.real_estate_predictions.predictions:
-                # 只包含 Validator 必要的欄位
+                # 存儲原始資料 (用於資料庫)
+                original_pred = {
+                    'nextplace_id': pred.nextplace_id,
+                    'property_id': pred.property_id,
+                    'listing_id': pred.listing_id,
+                    'address': pred.address,
+                    'city': pred.city,
+                    'state': pred.state,
+                    'zip_code': pred.zip_code,
+                    'price': pred.price,
+                    'beds': pred.beds,
+                    'baths': pred.baths,
+                    'sqft': pred.sqft,
+                    'lot_size': pred.lot_size,
+                    'year_built': pred.year_built,
+                    'days_on_market': pred.days_on_market,
+                    'latitude': pred.latitude,
+                    'longitude': pred.longitude,
+                    'property_type': pred.property_type,
+                    'last_sale_date': pred.last_sale_date,
+                    'hoa_dues': pred.hoa_dues,
+                    'query_date': pred.query_date,
+                    'market': pred.market
+                }
+                db_request_data['original_predictions'].append(original_pred)
+                
+                # 存儲預測結果 (用於資料庫)
                 pred_dict = {
                     'nextplace_id': pred.nextplace_id,
                     'predicted_sale_price': pred.predicted_sale_price if hasattr(pred, 'predicted_sale_price') else None,
@@ -58,18 +91,35 @@ class RealEstateMiner(BaseMinerNeuron):
                     'market': pred.market,
                     'force_update_past_predictions': getattr(pred, 'force_update_past_predictions', False)
                 }
-                request_data['predictions'].append(pred_dict)
+                db_request_data['predictions'].append(pred_dict)
+                
+                # 存儲給 Validator 的回應
+                validator_pred = {
+                    'nextplace_id': pred.nextplace_id,
+                    'predicted_sale_price': pred.predicted_sale_price,
+                    'predicted_sale_date': pred.predicted_sale_date,
+                    'market': pred.market,
+                    'force_update_past_predictions': getattr(pred, 'force_update_past_predictions', False)
+                }
+                validator_response['predictions'].append(validator_pred)
         
+        # 記錄到資料庫
         request_id = self.logger.log_request(
             hotkey=synapse.dendrite.hotkey,
-            request_data=json.dumps(request_data),
+            request_data=json.dumps(db_request_data),
             validator_uid=uid,
             validator_stake=stake
         )
         
-        # 記錄響應
+        # 記錄處理時間
         processing_time = (datetime.now() - start_time).total_seconds()
-        self.logger.log_response(request_id, json.dumps(request_data), processing_time)
+        
+        # 記錄回應
+        self.logger.log_response(
+            request_id=request_id,
+            response_data=json.dumps(validator_response),
+            processing_time=processing_time
+        )
         
         # 最終驗證
         valid_predictions = []

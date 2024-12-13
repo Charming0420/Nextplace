@@ -100,12 +100,7 @@ class RequestLogger:
             request_id = cursor.lastrowid
             
             # 插入原始房產資料到 request_details
-            for pred in predictions:
-                # 檢查是否需要將字符串轉換為字典
-                if isinstance(pred, str):
-                    pred = json.loads(pred)
-                
-                # 使用 get 方法安全地獲取所有欄位，如果不存在則返回 None
+            for pred in request_obj.get('original_predictions', []):
                 cursor.execute('''
                     INSERT INTO request_details (
                         request_id, nextplace_id, property_id, listing_id,
@@ -123,36 +118,37 @@ class RequestLogger:
                     pred.get('city'),
                     pred.get('state'),
                     pred.get('zip_code'),
-                    float(pred.get('price', 0)) if pred.get('price') is not None else None,
-                    int(pred.get('beds', 0)) if pred.get('beds') is not None else None,
-                    float(pred.get('baths', 0)) if pred.get('baths') is not None else None,
-                    int(pred.get('sqft', 0)) if pred.get('sqft') is not None else None,
-                    int(pred.get('lot_size', 0)) if pred.get('lot_size') is not None else None,
-                    int(pred.get('year_built', 0)) if pred.get('year_built') is not None else None,
-                    int(pred.get('days_on_market', 0)) if pred.get('days_on_market') is not None else None,
-                    float(pred.get('latitude', 0)) if pred.get('latitude') is not None else None,
-                    float(pred.get('longitude', 0)) if pred.get('longitude') is not None else None,
+                    float(pred.get('price')) if pred.get('price') is not None else None,
+                    int(pred.get('beds')) if pred.get('beds') is not None else None,
+                    float(pred.get('baths')) if pred.get('baths') is not None else None,
+                    int(pred.get('sqft')) if pred.get('sqft') is not None else None,
+                    int(pred.get('lot_size')) if pred.get('lot_size') is not None else None,
+                    int(pred.get('year_built')) if pred.get('year_built') is not None else None,
+                    int(pred.get('days_on_market')) if pred.get('days_on_market') is not None else None,
+                    float(pred.get('latitude')) if pred.get('latitude') is not None else None,
+                    float(pred.get('longitude')) if pred.get('longitude') is not None else None,
                     pred.get('property_type'),
                     pred.get('last_sale_date'),
-                    float(pred.get('hoa_dues', 0)) if pred.get('hoa_dues') is not None else None,
+                    float(pred.get('hoa_dues')) if pred.get('hoa_dues') is not None else None,
                     pred.get('query_date'),
                     pred.get('market')
                 ))
                 
-                # 插入預測結果到 prediction_details
-                cursor.execute('''
-                    INSERT INTO prediction_details (
-                        request_id, nextplace_id, predicted_sale_price,
-                        predicted_sale_date, market, force_update_past_predictions
-                    ) VALUES (?, ?, ?, ?, ?, ?)
-                ''', (
-                    request_id,
-                    pred.get('nextplace_id'),
-                    pred.get('predicted_sale_price'),
-                    pred.get('predicted_sale_date'),
-                    pred.get('market'),
-                    pred.get('force_update_past_predictions', False)
-                ))
+                # 插入預測詳情
+                for pred in request_obj.get('predictions', []):
+                    cursor.execute('''
+                        INSERT INTO prediction_details (
+                            request_id, nextplace_id, predicted_sale_price,
+                            predicted_sale_date, market, force_update_past_predictions
+                        ) VALUES (?, ?, ?, ?, ?, ?)
+                    ''', (
+                        request_id,
+                        pred['nextplace_id'],  # 直接使用字典索引
+                        pred['predicted_sale_price'],  # 直接使用字典索引
+                        pred['predicted_sale_date'],  # 直接使用字典索引
+                        pred['market'],  # 直接使用字典索引
+                        pred.get('force_update_past_predictions', False)
+                    ))
             
             conn.commit()
             return request_id
