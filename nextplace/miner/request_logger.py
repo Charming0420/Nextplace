@@ -83,7 +83,6 @@ class RequestLogger:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
-            # 解析請求數據
             request_obj = json.loads(request_data)
             predictions = request_obj.get('predictions', [])
             current_time = datetime.now().isoformat()
@@ -103,34 +102,52 @@ class RequestLogger:
             
             request_id = cursor.lastrowid
             
-            # 插入每個請求的詳細信息到 request_details
+            # 插入每個請求的詳細信息到 request_details 和 prediction_details
             for pred in predictions:
-                # 確保 pred 是字典類型
                 if isinstance(pred, str):
                     pred = json.loads(pred)
-                    
+                
+                # 從 Model.run_inference 計算預測結果
+                predicted_price = float(pred.get('price', 0.0))
+                query_date = pred.get('query_date')
+                if query_date:
+                    try:
+                        query_date = datetime.strptime(query_date, "%Y-%m-%dT%H:%M:%SZ")
+                    except ValueError:
+                        try:
+                            query_date = datetime.strptime(query_date, "%Y-%m-%d")
+                        except ValueError:
+                            query_date = datetime.now()
+                else:
+                    query_date = datetime.now()
+                
+                predicted_date = (query_date + timedelta(days=30)).strftime("%Y-%m-%d")
+                
+                # 插入到 request_details
                 cursor.execute('''
                     INSERT INTO request_details (
                         request_id, nextplace_id, market, request_timestamp,
-                        request_data
-                    ) VALUES (?, ?, ?, ?, ?)
+                        request_data, predicted_sale_price, predicted_sale_date
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     request_id,
                     pred.get('nextplace_id'),
                     pred.get('market'),
                     current_time,
-                    json.dumps(pred)  # 將整個預測數據存儲為 JSON
+                    json.dumps(pred),
+                    predicted_price,
+                    predicted_date
                 ))
                 
-                # 插入預測詳情
+                # 插入到 prediction_details
                 cursor.execute('''
                     INSERT INTO prediction_details (
                         request_id, nextplace_id, property_id, listing_id,
                         address, city, state, zip_code, price, beds,
                         baths, sqft, lot_size, year_built, days_on_market,
                         latitude, longitude, property_type, last_sale_date,
-                        hoa_dues, query_date, market
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        hoa_dues, query_date, market, predicted_price, predicted_date
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     request_id,
                     pred.get('nextplace_id'),
@@ -153,7 +170,9 @@ class RequestLogger:
                     pred.get('last_sale_date'),
                     pred.get('hoa_dues'),
                     pred.get('query_date'),
-                    pred.get('market')
+                    pred.get('market'),
+                    predicted_price,
+                    predicted_date
                 ))
             
             conn.commit()
