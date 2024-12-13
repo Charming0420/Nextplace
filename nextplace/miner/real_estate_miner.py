@@ -50,34 +50,12 @@ class RealEstateMiner(BaseMinerNeuron):
         
         if hasattr(synapse, 'real_estate_predictions') and hasattr(synapse.real_estate_predictions, 'predictions'):
             for pred in synapse.real_estate_predictions.predictions:
-                # 包含所有原始房產資料和預測資料
+                # 只包含 Validator 必要的欄位
                 pred_dict = {
-                    # 原始房產資料
                     'nextplace_id': pred.nextplace_id,
-                    'property_id': pred.property_id,
-                    'listing_id': pred.listing_id,
-                    'address': pred.address,
-                    'city': pred.city,
-                    'state': pred.state,
-                    'zip_code': pred.zip_code,
-                    'price': pred.price,
-                    'beds': pred.beds,
-                    'baths': pred.baths,
-                    'sqft': pred.sqft,
-                    'lot_size': pred.lot_size,
-                    'year_built': pred.year_built,
-                    'days_on_market': pred.days_on_market,
-                    'latitude': pred.latitude,
-                    'longitude': pred.longitude,
-                    'property_type': pred.property_type,
-                    'last_sale_date': pred.last_sale_date,
-                    'hoa_dues': pred.hoa_dues,
-                    'query_date': pred.query_date,
-                    'market': pred.market,
-                    
-                    # 預測資料
                     'predicted_sale_price': pred.predicted_sale_price if hasattr(pred, 'predicted_sale_price') else None,
                     'predicted_sale_date': pred.predicted_sale_date if hasattr(pred, 'predicted_sale_date') else None,
+                    'market': pred.market,
                     'force_update_past_predictions': getattr(pred, 'force_update_past_predictions', False)
                 }
                 request_data['predictions'].append(pred_dict)
@@ -93,6 +71,16 @@ class RealEstateMiner(BaseMinerNeuron):
         processing_time = (datetime.now() - start_time).total_seconds()
         self.logger.log_response(request_id, json.dumps(request_data), processing_time)
         
+        # 最終驗證
+        valid_predictions = []
+        for pred in synapse.real_estate_predictions.predictions:
+            if (hasattr(pred, 'nextplace_id') and pred.nextplace_id and
+                hasattr(pred, 'predicted_sale_price') and isinstance(pred.predicted_sale_price, float) and
+                hasattr(pred, 'predicted_sale_date') and pred.predicted_sale_date and
+                hasattr(pred, 'market') and pred.market):
+                valid_predictions.append(pred)
+        
+        synapse.real_estate_predictions.predictions = valid_predictions
         return synapse
 
     def _set_force_update_prediction_flag(self, synapse: RealEstateSynapse):
