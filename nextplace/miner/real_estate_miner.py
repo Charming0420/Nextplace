@@ -28,9 +28,16 @@ class RealEstateMiner(BaseMinerNeuron):
     def forward(self, synapse: RealEstateSynapse) -> RealEstateSynapse:
         start_time = datetime.now()
         
+        # 添加這行來查看原始資料
+        bt.logging.debug(f"收到的原始資料: {synapse.real_estate_predictions.predictions[0].__dict__}")
+        
         # 先執行預測
         self.model.run_inference(synapse)
         self._set_force_update_prediction_flag(synapse)
+        
+        # 添加預測結果日誌
+        for pred in synapse.real_estate_predictions.predictions:
+            bt.logging.debug(f"預測結果: ID={pred.nextplace_id}, 價格={pred.predicted_sale_price}, 日期={pred.predicted_sale_date}")
         
         # 記錄請求
         stake, uid = self.get_validator_stake_and_uid(synapse.dendrite.hotkey)
@@ -43,29 +50,35 @@ class RealEstateMiner(BaseMinerNeuron):
         
         if hasattr(synapse, 'real_estate_predictions') and hasattr(synapse.real_estate_predictions, 'predictions'):
             for pred in synapse.real_estate_predictions.predictions:
+                # 包含所有原始房產資料和預測資料
                 pred_dict = {
-                    'nextplace_id': pred.nextplace_id if hasattr(pred, 'nextplace_id') else None,
-                    'property_id': pred.property_id if hasattr(pred, 'property_id') else None,
-                    'listing_id': pred.listing_id if hasattr(pred, 'listing_id') else None,
-                    'address': pred.address if hasattr(pred, 'address') else None,
-                    'city': pred.city if hasattr(pred, 'city') else None,
-                    'state': pred.state if hasattr(pred, 'state') else None,
-                    'zip_code': pred.zip_code if hasattr(pred, 'zip_code') else None,
-                    'price': pred.price if hasattr(pred, 'price') else None,
-                    'beds': pred.beds if hasattr(pred, 'beds') else None,
-                    'baths': pred.baths if hasattr(pred, 'baths') else None,
-                    'sqft': pred.sqft if hasattr(pred, 'sqft') else None,
-                    'lot_size': pred.lot_size if hasattr(pred, 'lot_size') else None,
-                    'year_built': pred.year_built if hasattr(pred, 'year_built') else None,
-                    'days_on_market': pred.days_on_market if hasattr(pred, 'days_on_market') else None,
-                    'latitude': pred.latitude if hasattr(pred, 'latitude') else None,
-                    'longitude': pred.longitude if hasattr(pred, 'longitude') else None,
-                    'property_type': pred.property_type if hasattr(pred, 'property_type') else None,
-                    'last_sale_date': pred.last_sale_date if hasattr(pred, 'last_sale_date') else None,
-                    'hoa_dues': pred.hoa_dues if hasattr(pred, 'hoa_dues') else None,
-                    'market': pred.market if hasattr(pred, 'market') else None,
+                    # 原始房產資料
+                    'nextplace_id': pred.nextplace_id,
+                    'property_id': pred.property_id,
+                    'listing_id': pred.listing_id,
+                    'address': pred.address,
+                    'city': pred.city,
+                    'state': pred.state,
+                    'zip_code': pred.zip_code,
+                    'price': pred.price,
+                    'beds': pred.beds,
+                    'baths': pred.baths,
+                    'sqft': pred.sqft,
+                    'lot_size': pred.lot_size,
+                    'year_built': pred.year_built,
+                    'days_on_market': pred.days_on_market,
+                    'latitude': pred.latitude,
+                    'longitude': pred.longitude,
+                    'property_type': pred.property_type,
+                    'last_sale_date': pred.last_sale_date,
+                    'hoa_dues': pred.hoa_dues,
+                    'query_date': pred.query_date,
+                    'market': pred.market,
+                    
+                    # 預測資料
                     'predicted_sale_price': pred.predicted_sale_price if hasattr(pred, 'predicted_sale_price') else None,
-                    'predicted_sale_date': pred.predicted_sale_date if hasattr(pred, 'predicted_sale_date') else None
+                    'predicted_sale_date': pred.predicted_sale_date if hasattr(pred, 'predicted_sale_date') else None,
+                    'force_update_past_predictions': getattr(pred, 'force_update_past_predictions', False)
                 }
                 request_data['predictions'].append(pred_dict)
         

@@ -27,25 +27,9 @@ class RequestLogger:
             )
         ''')
         
-        # 創建請求詳情表
+        # 創建請求詳情表 (存儲 Validator 傳來的原始房產資料)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS request_details (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                request_id INTEGER,
-                nextplace_id TEXT,
-                market TEXT,
-                request_timestamp TEXT,
-                request_data TEXT,
-                response_data TEXT,
-                predicted_sale_price REAL,
-                predicted_sale_date TEXT,
-                FOREIGN KEY (request_id) REFERENCES request_logs(id)
-            )
-        ''')
-        
-        # 創建預測詳情表
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS prediction_details (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 request_id INTEGER,
                 nextplace_id TEXT,
@@ -57,7 +41,7 @@ class RequestLogger:
                 zip_code TEXT,
                 price REAL,
                 beds INTEGER,
-                baths REAL,
+                baths INTEGER,
                 sqft INTEGER,
                 lot_size INTEGER,
                 year_built INTEGER,
@@ -69,8 +53,20 @@ class RequestLogger:
                 hoa_dues REAL,
                 query_date TEXT,
                 market TEXT,
-                predicted_price REAL,
-                predicted_date TEXT,
+                FOREIGN KEY (request_id) REFERENCES request_logs(id)
+            )
+        ''')
+        
+        # 創建預測詳情表 (存儲發送給 Validator 的預測結果)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS prediction_details (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                request_id INTEGER,
+                nextplace_id TEXT,
+                predicted_sale_price REAL,
+                predicted_sale_date TEXT,
+                market TEXT,
+                force_update_past_predictions BOOLEAN DEFAULT FALSE,
                 FOREIGN KEY (request_id) REFERENCES request_logs(id)
             )
         ''')
@@ -83,6 +79,7 @@ class RequestLogger:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
+            # 解析請求數據
             request_obj = json.loads(request_data)
             predictions = request_obj.get('predictions', [])
             current_time = datetime.now().isoformat()
@@ -102,52 +99,21 @@ class RequestLogger:
             
             request_id = cursor.lastrowid
             
-            # 插入每個請求的詳細信息到 request_details 和 prediction_details
+            # 插入原始房產資料到 request_details
             for pred in predictions:
+                # 檢查是否需要將字符串轉換為字典
                 if isinstance(pred, str):
                     pred = json.loads(pred)
                 
-                # 從 Model.run_inference 計算預測結果
-                predicted_price = float(pred.get('price', 0.0))
-                query_date = pred.get('query_date')
-                if query_date:
-                    try:
-                        query_date = datetime.strptime(query_date, "%Y-%m-%dT%H:%M:%SZ")
-                    except ValueError:
-                        try:
-                            query_date = datetime.strptime(query_date, "%Y-%m-%d")
-                        except ValueError:
-                            query_date = datetime.now()
-                else:
-                    query_date = datetime.now()
-                
-                predicted_date = (query_date + timedelta(days=30)).strftime("%Y-%m-%d")
-                
-                # 插入到 request_details
+                # 使用 get 方法安全地獲取所有欄位，如果不存在則返回 None
                 cursor.execute('''
                     INSERT INTO request_details (
-                        request_id, nextplace_id, market, request_timestamp,
-                        request_data, predicted_sale_price, predicted_sale_date
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    request_id,
-                    pred.get('nextplace_id'),
-                    pred.get('market'),
-                    current_time,
-                    json.dumps(pred),
-                    predicted_price,
-                    predicted_date
-                ))
-                
-                # 插入到 prediction_details
-                cursor.execute('''
-                    INSERT INTO prediction_details (
                         request_id, nextplace_id, property_id, listing_id,
                         address, city, state, zip_code, price, beds,
                         baths, sqft, lot_size, year_built, days_on_market,
                         latitude, longitude, property_type, last_sale_date,
-                        hoa_dues, query_date, market, predicted_price, predicted_date
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        hoa_dues, query_date, market
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     request_id,
                     pred.get('nextplace_id'),
@@ -157,30 +123,42 @@ class RequestLogger:
                     pred.get('city'),
                     pred.get('state'),
                     pred.get('zip_code'),
-                    pred.get('price'),
-                    pred.get('beds'),
-                    pred.get('baths'),
-                    pred.get('sqft'),
-                    pred.get('lot_size'),
-                    pred.get('year_built'),
-                    pred.get('days_on_market'),
-                    pred.get('latitude'),
-                    pred.get('longitude'),
+                    float(pred.get('price', 0)) if pred.get('price') is not None else None,
+                    int(pred.get('beds', 0)) if pred.get('beds') is not None else None,
+                    float(pred.get('baths', 0)) if pred.get('baths') is not None else None,
+                    int(pred.get('sqft', 0)) if pred.get('sqft') is not None else None,
+                    int(pred.get('lot_size', 0)) if pred.get('lot_size') is not None else None,
+                    int(pred.get('year_built', 0)) if pred.get('year_built') is not None else None,
+                    int(pred.get('days_on_market', 0)) if pred.get('days_on_market') is not None else None,
+                    float(pred.get('latitude', 0)) if pred.get('latitude') is not None else None,
+                    float(pred.get('longitude', 0)) if pred.get('longitude') is not None else None,
                     pred.get('property_type'),
                     pred.get('last_sale_date'),
-                    pred.get('hoa_dues'),
+                    float(pred.get('hoa_dues', 0)) if pred.get('hoa_dues') is not None else None,
                     pred.get('query_date'),
+                    pred.get('market')
+                ))
+                
+                # 插入預測結果到 prediction_details
+                cursor.execute('''
+                    INSERT INTO prediction_details (
+                        request_id, nextplace_id, predicted_sale_price,
+                        predicted_sale_date, market, force_update_past_predictions
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                ''', (
+                    request_id,
+                    pred.get('nextplace_id'),
+                    pred.get('predicted_sale_price'),
+                    pred.get('predicted_sale_date'),
                     pred.get('market'),
-                    predicted_price,
-                    predicted_date
+                    pred.get('force_update_past_predictions', False)
                 ))
             
             conn.commit()
             return request_id
         except Exception as e:
-            bt.logging.error(f"數據庫操作錯誤: {e}")
-            bt.logging.error(f"錯誤的請求數據: {request_data}")
-            return None
+            bt.logging.error(f"Error logging request: {e}")
+            raise
         finally:
             conn.close()
 
