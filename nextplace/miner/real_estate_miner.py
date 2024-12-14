@@ -105,10 +105,11 @@ class RealEstateMiner(BaseMinerNeuron):
         
         # 記錄到資料庫
         request_id = self.logger.log_request(
-            hotkey=synapse.dendrite.hotkey,
-            request_data=json.dumps(db_request_data),
-            validator_uid=uid,
-            validator_stake=stake
+            request_data={
+                'hotkey': synapse.dendrite.hotkey,
+                'original_predictions': db_request_data['original_predictions']
+            },
+            predictions=db_request_data['predictions']
         )
         
         # 記錄處理時間
