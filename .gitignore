@@ -14,3 +14,4 @@ venv
 # Ignore specific directories
 requests_log.db
 requests_log.db-journal
+/home/ubuntu/Nextplace/nextplace/miner/ml/strategies/data_analytics/nextplace_training_data.csv
