@@ -13,3 +13,4 @@ venv
 
 # Ignore specific directories
 requests_log.db
+requests_log.db-journal
