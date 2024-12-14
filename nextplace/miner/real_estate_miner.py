@@ -2,7 +2,7 @@ import bittensor as bt
 from template.base.miner import BaseMinerNeuron
 from typing import Tuple
 from nextplace.protocol import RealEstateSynapse
-from nextplace.miner.ml.model import Model
+from nextplace.miner.ml.base_model import BaseModel as Model
 from nextplace.miner.ml.model_loader import ModelArgs
 from nextplace.miner.request_logger import RequestLogger
 from datetime import datetime
