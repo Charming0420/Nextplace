@@ -49,41 +49,35 @@ class MarketTracker:
 
 class CustomStrategy(BaseStrategy):
     def __init__(self):
-        # 定義最準確的市場列表（根據樣本數、變異率和標準差綜合評分）
-        self.accurate_markets = [
-            # 樣本數>100，變異率<2%，標準差<4%的市場
-            'Bismarck',   # 樣本:112, 變異:-0.68%, 標準差:1.79%
-            'Cheyenne',   # 樣本:159, 變異:-0.81%, 標準差:2.07%
-            'Meridian',   # 樣本:274, 變異:-0.95%, 標準差:1.94%
-            'Billings',   # 樣本:146, 變異:-1.19%, 標準差:3.27%
-            'Nampa',      # 樣本:247, 變異:-1.32%, 標準差:3.24%
-            'Baton Rouge',# 樣本:320, 變異:-1.22%, 標準差:3.54%
-            'Plano',      # 樣本:214, 變異:-1.51%, 標準差:2.91%
-            'Houston',    # 樣本:2546, 變異:-1.47%, 標準差:3.51%
-            'Caldwell',   # 樣本:146, 變異:-1.51%, 標準差:3.48%
-            'Corpus Christi', # 樣本:314, 變異:-1.64%, 標準差:3.98%
-            'Boise',      # 樣本:370, 變異:-1.47%, 標準差:4.07%
-            'St. Louis',  # 樣本:723, 變異:-1.88%, 標準差:4.56%
-            'Summerville',# 樣本:332, 變異:-1.54%, 標準差:4.20%
-            'Dallas',     # 樣本:1111, 變異:-1.97%, 標準差:3.96%
-            'Fort Worth', # 樣本:1114, 變異:-1.95%, 標準差:3.66%
-        ]
+        # 根據樣本數、變異率和標準差的綜合評分選擇市場
+        # 條件：樣本數 >= 100，abs_mean < 2%，std < 4%
+        self.accurate_markets = {
+            'Bismarck': {'count': 112, 'variance': -0.68, 'std': 1.79},
+            'Cheyenne': {'count': 159, 'variance': -0.81, 'std': 2.07},
+            'Meridian': {'count': 274, 'variance': -0.95, 'std': 1.94},
+            'Billings': {'count': 146, 'variance': -1.19, 'std': 3.27},
+            'Nampa': {'count': 247, 'variance': -1.32, 'std': 3.24},
+            'Baton Rouge': {'count': 320, 'variance': -1.22, 'std': 3.54},
+            'Plano': {'count': 214, 'variance': -1.51, 'std': 2.91},
+            'Houston': {'count': 2546, 'variance': -1.47, 'std': 3.51},
+            'Caldwell': {'count': 146, 'variance': -1.51, 'std': 3.48}
+        }
         self.market_tracker = MarketTracker()
     
     def predict(self, input_data: Dict[str, Any]) -> Tuple[float, str]:
         market = input_data.get('market')
-        property_type = str(input_data.get('property_type', ''))
-        sqft = float(input_data.get('sqft', 0))
-        year_built = int(input_data.get('year_built', 0))
-        base_price = float(input_data.get('price', 0))
         
         # 檢查是否需要為了覆蓋率而預測
         if self.market_tracker.should_predict(market):
             self.market_tracker.record_prediction(market)
-            return self._make_prediction(input_data)
+            prediction = self._make_prediction(input_data)
+            if prediction[0] is not None:
+                input_data['force_update_past_predictions'] = True
+            return prediction
         
-        # 檢查是否符合任一預測條件
+        # 檢查是否符合預測條件
         if self._should_predict(input_data):
+            input_data['force_update_past_predictions'] = True
             return self._make_prediction(input_data)
         
         return None, None
@@ -94,19 +88,28 @@ class CustomStrategy(BaseStrategy):
         sqft = float(data.get('sqft', 0))
         year_built = int(data.get('year_built', 0))
         
-        # 條件1：市場條件
+        # 市場評分系統
         if market in self.accurate_markets:
+            market_data = self.accurate_markets[market]
+            # 根據樣本數、變異率和標準差計算綜合分數
+            sample_score = min(1.0, market_data['count'] / 1000)  # 樣本數評分
+            variance_score = 1.0 - abs(market_data['variance']) / 2.0  # 變異率評分
+            std_score = 1.0 - market_data['std'] / 4.0  # 標準差評分
+            
+            # 綜合評分 (加權平均)
+            total_score = (sample_score * 0.3 + variance_score * 0.4 + std_score * 0.3)
+            
+            # 只有當綜合評分超過閾值時才預測
+            if total_score >= 0.7:
+                return True
+        
+        # 其他條件保持不變
+        if property_type in ['1', '6']:
             return True
         
-        # 條件2：物業類型條件
-        if property_type in ['1', '6']:  # Single Family Residential 或 House
-            return True
-        
-        # 條件3：面積條件
         if 100 <= sqft <= 2000:
             return True
         
-        # 條件4：建造年份條件
         if 2010 <= year_built <= 2024:
             return True
         
@@ -114,7 +117,7 @@ class CustomStrategy(BaseStrategy):
     
     def _make_prediction(self, data: Dict[str, Any]) -> Tuple[float, str]:
         base_price = float(data.get('price', 0))
-        query_date = datetime.strptime(data['query_date'], "%Y-%m-%dT%H:%M:%SZ")
-        predicted_date = query_date + timedelta(days=30)
+        query_date = datetime.now()  # 使用當前時間
+        predicted_date = query_date + timedelta(days=2)  # 預測兩天後
         
         return base_price, predicted_date.strftime("%Y-%m-%d")
