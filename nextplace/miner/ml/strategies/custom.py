@@ -2,49 +2,7 @@ import json
 import os
 from datetime import datetime, timedelta
 from typing import Dict, Any, Tuple
-
-# class MarketTracker:
-#     def __init__(self, file_path='market_tracker.json'):
-#         self.file_path = os.path.join('/home/ubuntu/Nextplace', file_path)
-#         self.init_file()
-    
-#     def init_file(self):
-#         if not os.path.exists(self.file_path):
-#             self._save_data({'predictions': {}})
-    
-#     def _load_data(self) -> Dict:
-#         try:
-#             with open(self.file_path, 'r') as f:
-#                 return json.load(f)
-#         except (FileNotFoundError, json.JSONDecodeError):
-#             return {'predictions': {}}
-    
-#     def _save_data(self, data: Dict):
-#         with open(self.file_path, 'w') as f:
-#             json.dump(data, f, indent=2)
-    
-#     def record_prediction(self, market: str):ㄋ
-#         data = self._load_data()
-#         today = datetime.now().strftime('%Y-%m-%d')
-        
-#         if market not in data['predictions']:
-#             data['predictions'][market] = []
-        
-#         data['predictions'][market].append(today)
-#         self._save_data(data)
-    
-#     def should_predict(self, market: str) -> bool:
-#         data = self._load_data()
-#         if market not in data['predictions']:
-#             return True
-        
-#         five_days_ago = (datetime.now() - timedelta(days=5)).strftime('%Y-%m-%d')
-#         recent_predictions = [
-#             date for date in data['predictions'][market]
-#             if date >= five_days_ago
-#         ]
-        
-#         return len(recent_predictions) == 0
+import bittensor as bt
 
 class CustomStrategy:
     def __init__(self):
@@ -71,60 +29,105 @@ class CustomStrategy:
             'Birmingham': {'count': 524, 'abs_mean': 1.85, 'std': 3.52},
             'Jackson': {'count': 386, 'abs_mean': 1.88, 'std': 3.56}
         }
-        # self.market_tracker = MarketTracker()
     
     def predict(self, input_data: Dict[str, Any]) -> Tuple[float, str]:
-        # # 檢查是否需要為了覆蓋率而預測
-        # market = input_data.get('market')
-        # if self.market_tracker.should_predict(market):
-        #     self.market_tracker.record_prediction(market)
-        #     prediction = self._make_prediction(input_data)
-        #     if prediction[0] is not None:
-        #         input_data['force_update_past_predictions'] = True
-        #     return prediction
-        
-        # 檢查是否符合預測條件
-        if self._should_predict(input_data):
-            input_data['force_update_past_predictions'] = True
+        """
+        主要預測函數
+        """
+        try:
+            nextplace_id = input_data.get('nextplace_id', 'unknown')
+            bt.logging.debug(f"開始處理房產 {nextplace_id} 的預測請求")
+            
+            # 檢查是否符合預測條件
+            should_predict = self._should_predict(input_data)
+            if not should_predict:
+                bt.logging.info(f"房產 {nextplace_id} 不符合任何預測條件，跳過預測")
+                return None, None
+            
+            # 符合條件時進行預測
             return self._make_prediction(input_data)
-        
-        return None, None
+            
+        except Exception as e:
+            bt.logging.error(f"預測過程發生錯誤: {str(e)}")
+            return None, None
     
     def _should_predict(self, data: Dict[str, Any]) -> bool:
         """
         檢查是否符合預測條件
         """
-        market = data.get('market')
-        property_type = str(data.get('property_type', ''))
-        sqft = float(data.get('sqft', 0))
-        year_built = int(data.get('year_built', 0))
-        
-        # 條件1：檢查市場是否在最佳市場列表中
-        if market in self.nice_market_list:
-            return True
-        
-        # 條件2：檢查房產類型
-        if property_type in ['1', '6']:
-            return True
-        
-        # 條件3：檢查面積範圍
-        if 100 <= sqft <= 2000:
-            return True
-        
-        # 條件4：檢查建造年份
-        if 2010 <= year_built <= 2024:
-            return True
-        
-        return False
+        try:
+            nextplace_id = data.get('nextplace_id', 'unknown')
+            market = str(data.get('market', '')).strip()
+            
+            # 檢查數值型資料
+            try:
+                sqft = float(data.get('sqft', 0))
+                year_built = int(data.get('year_built', 0))
+            except (ValueError, TypeError) as e:
+                bt.logging.error(f"房產 {nextplace_id} 的數值轉換錯誤: {str(e)}")
+                return False
+            
+            bt.logging.debug(f"檢查房產 {nextplace_id} 的條件:")
+            bt.logging.debug(f"市場: {market}")
+            bt.logging.debug(f"面積: {sqft}")
+            bt.logging.debug(f"建造年份: {year_built}")
+            
+            # 條件1：檢查市場是否在最佳市場列表中
+            in_nice_market = market in self.nice_market_list
+            if in_nice_market:
+                bt.logging.info(f"房產 {nextplace_id} 符合條件1: 市場 {market} 在最佳市場列表中")
+                return True
+            else:
+                bt.logging.debug(f"房產 {nextplace_id} 不符合條件1: 市場 {market} 不在最佳市場列表中")
+            
+            # 條件2：檢查面積範圍
+            valid_sqft = 100 <= sqft <= 2000
+            if valid_sqft:
+                bt.logging.info(f"房產 {nextplace_id} 符合條件2: 面積 {sqft} 在範圍內")
+                return True
+            else:
+                bt.logging.debug(f"房產 {nextplace_id} 不符合條件2: 面積 {sqft} 不在範圍內")
+            
+            # 條件3：檢查建造年份
+            valid_year = 2010 <= year_built <= 2024
+            if valid_year:
+                bt.logging.info(f"房產 {nextplace_id} 符合條件3: 建造年份 {year_built} 在範圍內")
+                return True
+            else:
+                bt.logging.debug(f"房產 {nextplace_id} 不符合條件3: 建造年份 {year_built} 不在範圍內")
+            
+            bt.logging.info(f"房產 {nextplace_id} 不符合任何預測條件")
+            return False
+            
+        except Exception as e:
+            bt.logging.error(f"檢查預測條件時發生錯誤: {str(e)}")
+            return False
     
     def _make_prediction(self, data: Dict[str, Any]) -> Tuple[float, str]:
         """
         生成預測結果
         """
         try:
-            base_price = float(data.get('price', 0))
-            predicted_date = datetime.now() + timedelta(days=2)
+            nextplace_id = data.get('nextplace_id', 'unknown')
             
-            return base_price, predicted_date.strftime("%Y-%m-%d")
-        except (ValueError, TypeError):
+            # 使用 listing price 作為預測價格
+            try:
+                price = float(data.get('price', 0))
+                if price <= 0:
+                    bt.logging.error(f"房產 {nextplace_id} 的價格無效: {price}")
+                    return None, None
+                bt.logging.debug(f"房產 {nextplace_id} 的價格: {price}")
+            except (ValueError, TypeError) as e:
+                bt.logging.error(f"房產 {nextplace_id} 的價格轉換錯誤: {str(e)}")
+                return None, None
+            
+            # 設定預測日期（當前日期+2天）
+            predicted_date = datetime.now() + timedelta(days=2)
+            predicted_date_str = predicted_date.strftime("%Y-%m-%d")
+            
+            bt.logging.info(f"生成預測結果: 房產={nextplace_id}, 價格={price}, 日期={predicted_date_str}")
+            return price, predicted_date_str
+            
+        except Exception as e:
+            bt.logging.error(f"生成預測結果時發生錯誤: {str(e)}")
             return None, None

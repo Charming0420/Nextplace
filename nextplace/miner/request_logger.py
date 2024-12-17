@@ -94,10 +94,12 @@ class RequestLogger:
             # 插入請求記錄
             cursor.execute('''
                 INSERT INTO request_logs (
-                    hotkey, timestamp, request_type
-                ) VALUES (?, ?, ?)
+                    hotkey, validator_uid, validator_stake, timestamp, request_type
+                ) VALUES (?, ?, ?, ?, ?)
             ''', (
                 request_data.get('hotkey'),
+                request_data.get('validator_uid'),
+                request_data.get('validator_stake'),
                 datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 'prediction'
             ))
@@ -131,21 +133,22 @@ class RequestLogger:
                 cursor.execute('''
                     INSERT INTO prediction_details (
                         request_id, nextplace_id, predicted_sale_price,
-                        predicted_sale_date, market
-                    ) VALUES (?, ?, ?, ?, ?)
+                        predicted_sale_date, market, force_update_past_predictions
+                    ) VALUES (?, ?, ?, ?, ?, ?)
                 ''', (
                     request_id,
-                    str(pred.get('nextplace_id')),
-                    float(pred.get('predicted_sale_price', 0)),
+                    pred.get('nextplace_id'),
+                    pred.get('predicted_sale_price'),
                     pred.get('predicted_sale_date'),
-                    pred.get('market')
+                    pred.get('market'),
+                    pred.get('force_update_past_predictions', False)
                 ))
             
             conn.commit()
             return request_id
         
         except Exception as e:
-            print(f"記錄請求錯誤: {e}")
+            bt.logging.error(f"記錄請求錯誤: {str(e)}")
             if conn:
                 conn.rollback()
             return -1
@@ -155,17 +158,23 @@ class RequestLogger:
 
     def log_response(self, request_id: int, response_data: str, processing_time: float):
         """記錄響應到數據庫"""
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            UPDATE request_logs
-            SET response_data = ?, processing_time = ?
-            WHERE id = ?
-        ''', (response_data, processing_time, request_id))
-        
-        conn.commit()
-        conn.close()
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                UPDATE request_logs
+                SET response_data = ?, processing_time = ?
+                WHERE id = ?
+            ''', (response_data, processing_time, request_id))
+            
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            bt.logging.error(f"記錄響應錯誤: {str(e)}")
+            if conn:
+                conn.rollback()
+                conn.close()
 
     def get_request_stats(self, days=1):
         """獲取請求統計信息"""
