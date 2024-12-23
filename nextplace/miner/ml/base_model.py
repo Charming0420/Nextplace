@@ -13,14 +13,16 @@ class BaseModel:
         """
         執行預測推理
         """
-        bt.logging.debug(f"開始處理 {len(synapse.real_estate_predictions.predictions)} 個預測請求")
+        total_predictions = len(synapse.real_estate_predictions.predictions)
+        bt.logging.info(f"收到 {total_predictions} 個預測請求")
+        
         valid_predictions = []
+        error_count = 0
         
         for prediction in synapse.real_estate_predictions.predictions:
             try:
                 # 驗證必要欄位
                 if not self._validate_prediction(prediction):
-                    bt.logging.debug(f"房產 {getattr(prediction, 'nextplace_id', 'unknown')} 缺少必要欄位，跳過")
                     continue
                 
                 # 使用策略進行預測
@@ -34,17 +36,21 @@ class BaseModel:
                     prediction.nextplace_id = str(prediction.nextplace_id)
                     prediction.force_update_past_predictions = True
                     valid_predictions.append(prediction)
-                    bt.logging.debug(f"房產 {prediction.nextplace_id} 預測成功: 價格={price}, 日期={date}")
-                else:
-                    bt.logging.debug(f"房產 {prediction.nextplace_id} 不符合預測條件，跳過")
                 
             except Exception as e:
-                bt.logging.error(f"處理房產 {getattr(prediction, 'nextplace_id', 'unknown')} 時發生錯誤: {str(e)}")
+                error_count += 1
                 continue
         
         # 更新預測列表，只保留有效預測
         synapse.real_estate_predictions.predictions = valid_predictions
-        bt.logging.debug(f"預測處理完成，保留 {len(valid_predictions)} 個符合條件的預測")
+        
+        # 輸出批次處理統計
+        bt.logging.info(f"預測處理完成:")
+        bt.logging.info(f"- 總請求數: {total_predictions}")
+        bt.logging.info(f"- 成功預測: {len(valid_predictions)}")
+        bt.logging.info(f"- 不符合條件: {total_predictions - len(valid_predictions) - error_count}")
+        if error_count > 0:
+            bt.logging.info(f"- 處理錯誤: {error_count}")
     
     def _validate_prediction(self, prediction) -> bool:
         """
@@ -56,13 +62,11 @@ class BaseModel:
             for field in required_fields:
                 # 檢查欄位是否存在
                 if not hasattr(prediction, field):
-                    bt.logging.debug(f"房產缺少必要欄位: {field}")
                     return False
                 
                 # 檢查欄位值是否為 None
                 value = getattr(prediction, field)
                 if value is None:
-                    bt.logging.debug(f"房產欄位 {field} 的值為 None")
                     return False
                 
                 # 特別處理數值型欄位
@@ -70,10 +74,8 @@ class BaseModel:
                     try:
                         float_value = float(value)
                         if float_value <= 0:
-                            bt.logging.debug(f"房產欄位 {field} 的值必須大於0: {float_value}")
                             return False
                     except (ValueError, TypeError):
-                        bt.logging.debug(f"房產欄位 {field} 的值無法轉換為數值: {value}")
                         return False
                 
                 # 特別處理年份欄位
@@ -81,14 +83,11 @@ class BaseModel:
                     try:
                         year = int(value)
                         if year <= 0:
-                            bt.logging.debug(f"房產建造年份無效: {year}")
                             return False
                     except (ValueError, TypeError):
-                        bt.logging.debug(f"房產建造年份無法轉換為數值: {value}")
                         return False
             
             return True
             
-        except Exception as e:
-            bt.logging.error(f"驗證預測請求時發生錯誤: {str(e)}")
+        except Exception:
             return False

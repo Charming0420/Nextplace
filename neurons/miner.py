@@ -4,9 +4,37 @@ import bittensor as bt
 from nextplace.miner.ml.model_loader import ModelArgs
 from nextplace.miner.real_estate_miner import RealEstateMiner
 import logging
+from datetime import datetime
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+def setup_logging():
+    # 配置根日誌記錄器
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s | %(levelname)s | %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
+    # 降低其他模組的日誌級別
+    logging.getLogger("bittensor").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
 
+class BatchStats:
+    def __init__(self):
+        self.total_requests = 0
+        self.processed_requests = 0
+        self.skipped_requests = 0
+        self.error_requests = 0
+        self.start_time = datetime.now()
+
+    def get_summary(self):
+        end_time = datetime.now()
+        processing_time = (end_time - self.start_time).total_seconds()
+        return f"""批次處理統計:
+- 總請求數: {self.total_requests}
+- 成功處理: {self.processed_requests}
+- 跳過處理: {self.skipped_requests}
+- 處理失敗: {self.error_requests}
+- 處理時間: {processing_time:.2f}秒"""
 
 # Build the ArgumentParser using wallet, subtensor, logging, and validator permit enforcing
 def build_argument_parser() -> ArgumentParser:
@@ -99,6 +127,7 @@ def check_args(args: ModelArgs) -> None:
 
 # Build RealEstateMiner object, call .run() on it
 def main():
+    setup_logging()
 
     parser = build_argument_parser()  # get arg parser
     config = bt.config(parser)  # build config
