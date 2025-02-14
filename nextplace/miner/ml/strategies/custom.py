@@ -1,34 +1,38 @@
 import json
 import os
 from datetime import datetime, timedelta
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, List
 import bittensor as bt
 
 class CustomStrategy:
     def __init__(self):
-        # 根據樣本數、變異率和標準差選出的前20個最佳市場
-        self.nice_market_list = {
-            'Bismarck': {'count': 112, 'abs_mean': 0.68, 'std': 1.79},
-            'Cheyenne': {'count': 159, 'abs_mean': 0.81, 'std': 2.07},
-            'Meridian': {'count': 274, 'abs_mean': 0.95, 'std': 1.94},
-            'Billings': {'count': 146, 'abs_mean': 1.19, 'std': 3.27},
-            'Nampa': {'count': 247, 'abs_mean': 1.32, 'std': 3.24},
-            'Baton Rouge': {'count': 320, 'abs_mean': 1.22, 'std': 3.54},
-            'Plano': {'count': 214, 'abs_mean': 1.51, 'std': 2.91},
-            'Houston': {'count': 2546, 'abs_mean': 1.47, 'std': 3.51},
-            'Caldwell': {'count': 146, 'abs_mean': 1.51, 'std': 3.48},
-            'Fort Worth': {'count': 892, 'abs_mean': 1.62, 'std': 3.12},
-            'Dallas': {'count': 1245, 'abs_mean': 1.58, 'std': 3.24},
-            'Austin': {'count': 1102, 'abs_mean': 1.64, 'std': 3.18},
-            'San Antonio': {'count': 986, 'abs_mean': 1.71, 'std': 3.32},
-            'Oklahoma City': {'count': 742, 'abs_mean': 1.68, 'std': 3.28},
-            'Tulsa': {'count': 584, 'abs_mean': 1.72, 'std': 3.35},
-            'Little Rock': {'count': 428, 'abs_mean': 1.75, 'std': 3.42},
-            'Memphis': {'count': 652, 'abs_mean': 1.78, 'std': 3.45},
-            'Nashville': {'count': 884, 'abs_mean': 1.82, 'std': 3.48},
-            'Birmingham': {'count': 524, 'abs_mean': 1.85, 'std': 3.52},
-            'Jackson': {'count': 386, 'abs_mean': 1.88, 'std': 3.56}
-        }
+        """
+        初始化策略
+        
+        過去的篩選標準（已停用）：
+        1. 特定市場列表篩選
+        2. 面積範圍篩選 (100-2000 平方呎)
+        3. 建造年份篩選 (2010-2024)
+        
+        現行篩選標準：
+        - 根據預定義的價格區間進行篩選
+        """
+        self.price_ranges = [
+            (930000, 940000), (500000, 510000),
+            (550000, 560000), (400000, 410000),
+            (750000, 760000), (350000, 360000),
+            (800000, 810000), (300000, 310000),
+            (410000, 420000), (650000, 660000),
+            (480000, 490000), (710000, 720000),
+            (360000, 370000), (660000, 670000),
+            (760000, 770000), (380000, 390000),
+            (600000, 610000), (530000, 540000),
+            (910000, 920000), (450000, 460000),
+            (860000, 870000), (460000, 470000),
+            (510000, 520000), (610000, 620000),
+            (630000, 640000), (330000, 340000),
+            (440000, 450000), (880000, 890000)
+        ]
     
     def predict(self, input_data: Dict[str, Any]) -> Tuple[float, str]:
         """
@@ -48,28 +52,22 @@ class CustomStrategy:
     def _should_predict(self, data: Dict[str, Any]) -> bool:
         """
         檢查是否符合預測條件
+        
+        目前僅檢查價格是否落在預定義的區間內
         """
         try:
-            market = str(data.get('market', '')).strip()
-            
-            # 檢查數值型資料
+            # 獲取並驗證價格
             try:
-                sqft = float(data.get('sqft', 0))
-                year_built = int(data.get('year_built', 0))
+                price = float(data.get('price', 0))
+                if price <= 0:
+                    return False
             except (ValueError, TypeError):
                 return False
             
-            # 條件1：檢查市場是否在最佳市場列表中
-            if market in self.nice_market_list:
-                return True
-            
-            # 條件2：檢查面積範圍
-            if 100 <= sqft <= 2000:
-                return True
-            
-            # 條件3：檢查建造年份
-            if 2010 <= year_built <= 2024:
-                return True
+            # 檢查價格是否在任一預定義區間內
+            for min_price, max_price in self.price_ranges:
+                if min_price < price <= max_price:
+                    return True
             
             return False
             
@@ -79,6 +77,9 @@ class CustomStrategy:
     def _make_prediction(self, data: Dict[str, Any]) -> Tuple[float, str]:
         """
         生成預測結果
+        
+        價格預測：直接使用輸入價格
+        日期預測：當前日期 + 2天
         """
         try:
             # 使用 listing price 作為預測價格
